@@ -1,6 +1,6 @@
 ;;; mac-key-mode.el --- provide mac-style key bindings on Carbon Emacs
 
-;; Copyright (C) 2004-2008  Seiji Zenitani
+;; Copyright (C) 2004-2010  Seiji Zenitani
 
 ;; Author: Seiji Zenitani <zenitani@mac.com>
 ;; $Id$
@@ -34,13 +34,12 @@
 ;;
 ;; To use this package, add these lines to your .emacs file:
 ;;
-;; ;;    (require 'redo)
 ;;     (require 'mac-key-mode)
 ;;     (mac-key-mode 1)
 ;;
-;; Note that mac-key-mode requires redo.el.
-;; In order to set additional key bindings,
-;; modify mac-key-mode-map in your .emacs file:
+;; Note that mac-key-mode works better with redo+.el (but I don't use
+;; it...)  In order to set additional key bindings, modify
+;; mac-key-mode-map in your .emacs file:
 ;;
 ;;     (require 'mac-key-mode)
 ;;     (define-key mac-key-mode-map [(alt l)] 'goto-line)
@@ -65,17 +64,12 @@
 
 ;;; Code:
 
-;; requires redo
-(require 'redo)
 
 (defgroup mac-key-mode nil
   "Mac-style key-binding mode."
   :group 'mac
   :version "22.3")
-(defconst mac-key-mode-lighter
-  (char-to-string 343416) ;; the command mark
-;;  (char-to-string 323935) ;; the Apple mark
-;;  (char-to-string (ucs-to-char 63743)) ;; the Apple mark
+(defconst mac-key-mode-lighter (char-to-string 8984) ; the command mark
   "A lighter string which is displayed in the modeline
 when `mac-key-mode' is on.")
 
@@ -112,7 +106,9 @@ when `mac-key-mode' is on.")
     (define-key map [(alt p)] 'print-buffer)
     (define-key map [(alt q)] 'save-buffers-kill-emacs)
     (define-key map [(alt z)] 'undo)
-    (define-key map [(alt shift z)] 'redo) ; requires redo
+    (when (require 'redo nil t)
+      ;; requires redo+
+      (define-key map [(alt shift z)] 'redo))
     (define-key map [(alt x)] 'clipboard-kill-region)
     (define-key map [(alt c)] 'clipboard-kill-ring-save)
     (define-key map [(alt v)] 'clipboard-yank)
@@ -284,8 +280,8 @@ When Mac Key mode is enabled, mac-style key bindings are provided."
 
     (cond
      ((not (stringp item)))
-     ((string-match tramp-file-name-regexp item)
-      (error "Remote directories not supported"))
+     ((file-remote-p item)
+      (error "This item is located on a remote system."))
      (t
       (setq item (expand-file-name item))
       (condition-case err
@@ -313,8 +309,8 @@ When Mac Key mode is enabled, mac-style key bindings are provided."
 
     (cond
      ((not (stringp item)))
-     ((string-match tramp-file-name-regexp item)
-      (error "Remote directories not supported"))
+     ((file-remote-p item)
+      (error "This item is located on a remote system."))
      ((file-directory-p item)
       (setq item (expand-file-name item))
       (condition-case err
@@ -345,11 +341,7 @@ When Mac Key mode is enabled, mac-style key bindings are provided."
   (interactive "r")
   (mac-key-stop-speaking)
   (let ((buffer-file-coding-system 'utf-8-unix)
-        (tmp-file (expand-file-name
-                   "speech.text"
-                   (if (featurep 'carbon-emacs-package)
-                       (carbon-emacs-package-tmpdir) "/tmp")
-                   )))
+        (tmp-file (make-temp-file "emacs-speech-" nil ".txt")))
     (write-region beg end tmp-file nil)
     (message "Invoking text-to-speech...")
     (setq mac-key-speech-process
@@ -380,7 +372,7 @@ like this:
        (lambda() (local-set-key \" \" 'mac-key-quick-look)))
 "
   (interactive)
-  
+
   (let ((mybuffer (and mac-key-ql-process
                        (process-buffer mac-key-ql-process)))
         (item default-directory))
@@ -389,8 +381,8 @@ like this:
       (kill-buffer mybuffer))
 ;;       (eq (process-status mac-key-ql-process) 'run)
 ;;       (kill-process mac-key-ql-process))
-     ((string-match tramp-file-name-regexp item)
-      (error "Remote directories not supported"))
+     ((file-remote-p item)
+      (error "This item is located on a remote system."))
      (t
       (setq item (expand-file-name item))
       (condition-case err
